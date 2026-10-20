@@ -1,0 +1,14 @@
+# Entorno virtual y Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Variables de entorno y llaves secretas
+.env
+
+# Pruebas y caché
+.pytest_cache/
+.coverage

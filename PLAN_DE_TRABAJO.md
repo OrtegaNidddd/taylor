@@ -34,13 +34,12 @@ flowchart LR
     ├── app.py                     # Entrypoint de Streamlit
     ├── core/
     │   ├── __init__.py
-    │   ├── parser.py              # Validación y parseo seguro
-    │   ├── taylor_engine.py       # Motor simbólico de Taylor
-    │   └── numeric_eval.py        # Mallas y cálculo de residuo
+    │   └── taylor_math.py         # Backend: parseo seguro, Taylor, malla, percentiles, residuo y comparador
     ├── ui/
     │   ├── __init__.py
     │   ├── components.py          # Widgets y sidebar
     │   ├── latex_display.py       # Fórmulas y pasos matemáticos
+    │   ├── plotting_2d.py         # Mapa de calor 2D log10(E) con curvas de nivel
     │   └── plotting_3d.py         # Gráficas tridimensionales Plotly
     ├── tests/
     │   ├── __init__.py
@@ -50,7 +49,7 @@ flowchart LR
     ├── PLAN_DE_TRABAJO.md
     └── README.md
     ```
-- [x] **1.2 Motor de Parseo Seguro y Sanitización (`core/parser.py`)**
+- [x] **1.2 Motor de Parseo Seguro y Sanitización (`core/taylor_math.py`)**
   - [x] Implementar función `parse_math_expression(expr_str: str) -> sp.Expr`.
   - [x] Definir diccionario de funciones matemáticas permitidas (lista blanca: `sin`, `cos`, `tan`, `exp`, `log`, `sqrt`, potencias, etc.).
   - [x] Prohibir llamadas peligrosas (`eval`, `exec`, `__import__`, introspección de objetos).
@@ -58,9 +57,9 @@ flowchart LR
   - [x] Crear manejador de excepciones personalizado con mensajes de error amigables para el estudiante.
 - [x] **1.3 Controles de Entrada y Parametrización (`ui/components.py`)**
   - [x] Campo de texto para la función $f(x, y)$ con autovalidación.
-  - [x] Campos numéricos o sliders para el punto de anclaje $(x_0, y_0)$.
-  - [x] Selector discreto para el grado del polinomio $n$ (rango pedagógico: 1 a 5).
-  - [x] Sliders de rango para el dominio: $[x_{\min}, x_{\max}]$ y $[y_{\min}, y_{\max}]$.
+  - [x] Controles deslizantes para las coordenadas del centro $(x_0, y_0)$.
+  - [x] Selector discreto para el grado del polinomio $n$ (rango pedagógico: 0 a 6).
+  - [x] Control deslizante del radio de visualización $r$ (ventana $[x_0 \pm r] \times [y_0 \pm r]$) y de la resolución de la malla.
   - [x] Control numérico para la tolerancia de error $\epsilon$ (umbral del residuo).
   - [x] Catálogo selector de funciones didácticas predefinidas (ej. paraboloide, silla de montar, campana gaussiana, armónicos).
 
@@ -69,7 +68,7 @@ flowchart LR
 ### Fase 2: Motor Simbólico y Algoritmo de Taylor Multivariable
 > **Objetivos:** Calcular derivadas parciales y construir el polinomio de Taylor simbólico general para cualquier grado $n$ (RF2).
 
-- [x] **2.1 Algoritmo General de Expansión de Taylor en 2D (`core/taylor_engine.py`)**
+- [x] **2.1 Algoritmo General de Expansión de Taylor en 2D (`core/taylor_math.py`)**
   - [x] Diseñar el algoritmo combinatorio para generar la suma doble:
     $$P_n(x, y) = \sum_{i=0}^{n} \sum_{j=0}^{n-i} \frac{1}{i! j!} \frac{\partial^{i+j} f}{\partial x^i \partial y^j}(x_0, y_0) (x - x_0)^i (y - y_0)^j$$
   - [x] Memoizar derivadas parciales para no recalcular derivadas cruzadas redundantes ($\frac{\partial^2 f}{\partial x \partial y} = \frac{\partial^2 f}{\partial y \partial x}$).
@@ -87,8 +86,9 @@ flowchart LR
 ### Fase 3: Evaluación Numérica, Mallas y Cuantificación del Residuo
 > **Objetivos:** Vectorizar la evaluación en NumPy, calcular el error punto a punto y determinar la región de convergencia (RF2, RNF2).
 
-- [x] **3.1 Generación de Mallas y Vectorización (`core/numeric_eval.py`)**
-  - [x] Crear malla bidimensional regular con `np.linspace` y `np.meshgrid` en función de los límites $[x_{\min}, x_{\max}]$ y $[y_{\min}, y_{\max}]$.
+- [x] **3.1 Generación de Mallas y Vectorización (`core/taylor_math.py`)**
+  - [x] Crear malla bidimensional regular con `np.linspace` y `np.meshgrid` según el radio de vecindad $r$ y la resolución parametrizada.
+  - [x] Recorte robusto de asíntotas basado en percentiles (2–98 %).
   - [x] Compilar las expresiones simbólicas de $f(x, y)$ y $P_n(x, y)$ a funciones vectorizadas de NumPy mediante `sp.lambdify`.
   - [x] Manejar casos en que la función aproximada o real sea constante (asegurar retorno de matrices del mismo tamaño que la malla).
 - [x] **3.2 Manejo de Singularidades, Discontinuidades y Valores Fuera de Dominio**
@@ -112,19 +112,14 @@ flowchart LR
 > **Objetivos:** Generar una representación tridimensional rica, contrastada y con manipulación espacial fluida (RF3).
 
 - [x] **4.1 Construcción de Superficies en 3D (`ui/plotting_3d.py`)**
-  - [x] Trazar la superficie original $z = f(x, y)$ con escala de colores diferenciada (ej. `Viridis`), superficie continua y opacidad base (0.85).
-  - [x] Trazar la superficie del polinomio $z = P_n(x, y)$ con paleta cálida (`Reds`), permitiendo distinguir visualmente intersecciones y desprendimientos.
+  - [x] Trazar la superficie original $z = f(x, y)$ con escala de colores diferenciada (ej. `Viridis`), superficie continua y opacidad fija (0.9).
+  - [x] Trazar la superficie del polinomio $z = P_n(x, y)$ con paleta cálida (`YlOrRd`) y transparencia ajustable, permitiendo distinguir visualmente intersecciones y desprendimientos.
   - [x] Agregar marcador esférico 3D (`go.Scatter3d`) en el punto de expansión $(x_0, y_0, f(x_0, y_0))$.
-- [x] **4.2 Visualización de la Región de Tolerancia y Residuo**
-  - [x] Representar los puntos sobre la superficie que cumplen con la tolerancia $|f - P_n| \le \epsilon$ con marcadores destacados.
-  - [x] Modo de vista alternativa con superficie exclusiva del residuo $z = E(x, y)$ y plano de corte en $z = \epsilon$.
-- [x] **4.3 Controles Interactivos de Capas y Cámara**
-  - [x] Toggles para encender/apagar individualmente:
-    - [x] Superficie original $f(x, y)$.
-    - [x] Superficie aproximación $P_n(x, y)$.
-    - [x] Punto de apoyo $(x_0, y_0)$.
-    - [x] Región de error / tolerancia.
-  - [x] Control deslizante para regular la opacidad de las superficies (transparencia dinámica).
+- [x] **4.2 Mapas de Error y Comparador Puntual**
+  - [x] Superficie 3D del residuo $z = E(x, y)$ con plano $z = \epsilon$ y curva de contorno de tolerancia proyectada.
+  - [x] Mapa de calor 2D logarítmico $\log_{10}(E)$ (escala Turbo) con curvas de nivel blancas y frontera $E = \epsilon$ (`ui/plotting_2d.py`).
+  - [x] Comparador puntual en $(x_1, y_1)$: valor exacto, aproximación, error absoluto y relativo, y segmento vertical en el visor 3D.
+- [x] **4.3 Cámara**
   - [x] Configuración ergonómica de cámara Plotly (rotación orbital libre, paneo, zoom, ratio de aspecto cúbico y hovertemplate con coordenadas $x, y, z$).
 
 ---
@@ -170,7 +165,7 @@ flowchart LR
 
 - [x] **6.1 Suite de Pruebas Automatizadas (`tests/`)**
   - [x] `test_parser.py`: Probar entradas válidas, sintaxis con errores, funciones compuestas y bloqueos de seguridad.
-  - [x] `test_taylor.py`: Comparar polinomios generados para funciones estándar contra soluciones analíticas exactas (grados 1 a 5).
+  - [x] `test_taylor.py`: Comparar polinomios generados para funciones estándar contra soluciones analíticas exactas (grados 0 a 6).
   - [x] `test_numeric.py`: Validar dimensiones de mallas, ausencia de NaNs destructivos y exactitud del cálculo de residuo.
 - [x] **6.2 Optimización de Rendimiento y Memoria**
   - [x] Caché interno en derivadas evaluadas y simplificación eficiente.
@@ -188,16 +183,16 @@ flowchart LR
 | Código | Requerimiento Funcional / No Funcional | Módulo Responsable | Entregable Concreto | Estado |
 | :--- | :--- | :--- | :--- | :---: |
 | **RF1** | Entrada de $f(x,y)$, $(x_0, y_0)$, grado $n$, dominio y tolerancia | `ui/components.py` | Widgets de entrada con validación en tiempo real | Completado |
-| **RF2.1** | Cálculo de derivadas parciales hasta orden $n$ | `core/taylor_engine.py` | Motor de diferenciación con SymPy | Completado |
-| **RF2.2** | Polinomio analítico explícito y plano tangente | `core/taylor_engine.py` | Expresión simbólica de Taylor $P_n(x,y)$ | Completado |
-| **RF2.3** | Malla numérica y cálculo del residuo $\|f - P_n\|$ | `core/numeric_eval.py` | Matrices NumPy evaluadas y matriz de error | Completado |
-| **RF2.4** | Región de convergencia/validez con tolerancia | `core/numeric_eval.py` | Máscara booleana y métricas de error | Completado |
+| **RF2.1** | Cálculo de derivadas parciales hasta orden $n$ | `core/taylor_math.py` | Motor de diferenciación con SymPy | Completado |
+| **RF2.2** | Polinomio analítico explícito y plano tangente | `core/taylor_math.py` | Expresión simbólica de Taylor $P_n(x,y)$ | Completado |
+| **RF2.3** | Malla numérica y cálculo del residuo $\|f - P_n\|$ | `core/taylor_math.py` | Matrices NumPy evaluadas y matriz de error | Completado |
+| **RF2.4** | Región de convergencia/validez con tolerancia | `core/taylor_math.py` | Máscara booleana y métricas de error | Completado |
 | **RF3.1** | Superficies 3D de $f(x,y)$ y $P_n(x,y)$ diferenciadas | `ui/plotting_3d.py` | Superficies tridimensionales con paletas contrastantes | Completado |
 | **RF3.2** | Representación del residuo y controles de visibilidad | `ui/plotting_3d.py` | Capas conmutables y visualización de tolerancia | Completado |
 | **RF3.3** | Interacción espacial (rotación, zoom, tooltips) | `ui/plotting_3d.py` | Escena 3D Plotly con cámara orbital | Completado |
 | **RF4** | Reactividad y despliegue formal en $\LaTeX$ | `app.py`, `ui/latex_display.py` | Interfaz reactiva con fórmulas y paso a paso | Completado |
-| **RNF1** | Seguridad y robustez del parser | `core/parser.py` | Parseo seguro con lista blanca de funciones | Completado |
-| **RNF2** | Rendimiento computacional | `core/numeric_eval.py` | Vectorización pura NumPy y caching | Completado |
+| **RNF1** | Seguridad y robustez del parser | `core/taylor_math.py` | Parseo seguro con lista blanca de funciones | Completado |
+| **RNF2** | Rendimiento computacional | `core/taylor_math.py` | Vectorización NumPy y caché `@st.cache_data` en `app.py` | Completado |
 | **RNF3** | Código abierto y compatibilidad | Raíz del proyecto | Stack 100% Python/Streamlit/SymPy/Plotly | Completado |
 | **RNF4** | Usabilidad pedagógica | `ui/latex_display.py` | Desglose didáctico y catálogo de ejemplos guiados | Completado |
 | **PLUS-IA** | Tutor Inteligente con IA | `core/ai_tutor.py` | Explicaciones conceptuales en tiempo real (Gemini / DeepSeek) | Completado |

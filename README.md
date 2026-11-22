@@ -1,33 +1,48 @@
-# 📐 Visualizador Interactivo del Polinomio de Taylor en $\mathbb{R}^2$
+# Visualizador Interactivo del Polinomio de Taylor en $\mathbb{R}^2$
 
 Herramienta web educativa e interactiva diseñada para la asignatura de **Cálculo Multivariado**. Conecta el rigor analítico y algebraico del Polinomio de Taylor en dos variables con su interpretación geométrica y espacial en 3D en tiempo real, e integra un **Tutor Inteligente con IA** (Gemini y DeepSeek).
 
 ---
 
-## 🚀 Características Principales
+## Características Principales
 
 - **Entrada de Funciones Analíticas Bidimensionales:** Parser matemático seguro que admite funciones elementales (`sin`, `cos`, `exp`, `log`, `sqrt`, etc.), multiplicación implícita (`2x`, `3y`) y potencias con `^`.
 - **Motor Simbólico con SymPy:**
-  - Cálculo general de Taylor para cualquier grado $n \ge 1$.
+  - Cálculo general de Taylor para grados $0 \le n \le 6$ ($n = 0$: plano horizontal $z = f(x_0, y_0)$).
   - Plano tangente ($n=1$) y gradiente $\nabla f(x_0, y_0)$.
   - Matriz Hessiana y análisis de curvatura ($n \ge 2$).
-  - Desglose término a término por órdenes con valores simbólicos y numéricos.
-- **Evaluación Numérica Vectorizada con NumPy:** Discretización espacial sobre mallas 2D con manejo seguro de discontinuidades y filtrado de singularidades.
+  - Evaluación exacta en el centro (números racionales) e indeterminaciones resueltas mediante límites iterados.
+  - Polinomio en LaTeX y su código fuente copiable; desglose término a término por órdenes.
+- **Evaluación Numérica Vectorizada con NumPy:** Malla según el radio de vecindad y la resolución elegidos, compilada con `sp.lambdify`, con recorte robusto de asíntotas por percentiles (2–98 %).
 - **Visor Tridimensional Interactivo con Plotly:**
-  - Superficies diferenciadas por paletas contrastantes y opacidad ajustable.
-  - Marcador tridimensional del punto de apoyo $(x_0, y_0, f(x_0, y_0))$.
-  - Identificación visual de la **zona de convergencia / tolerancia** ($|f - P_n| \le \epsilon$).
-  - Superficie dedicada opcional para el residuo absoluto.
+  - Superficies superpuestas: $f(x, y)$ en Viridis y $P_n(x, y)$ en paleta cálida con transparencia ajustable.
+  - Trazador del punto central $(x_0, y_0, f(x_0, y_0))$ y comparador vertical de error puntual en $(x_1, y_1)$.
+  - Superficie 3D del residuo con curva de contorno de tolerancia $E = \epsilon$.
   - Rotación orbital libre, paneo, zoom y lectura de coordenadas al pasar el cursor.
-- **🤖 Tutor Inteligente con IA (Gemini & DeepSeek):**
+- **Mapa de Calor del Error:** $\log_{10}(E)$ en escala Turbo con curvas de nivel blancas que delimitan la región de validez.
+- **Comparador Puntual:** valor exacto, aproximación, error absoluto y error relativo en cualquier punto $(x_1, y_1)$.
+- **Tutor Inteligente con IA (Gemini & DeepSeek):**
   - Generación de explicaciones pedagógicas adaptadas al estado actual de la función y su residuo.
   - Capacidad para responder preguntas libres de los alumnos sobre el comportamiento geométrico.
   - Diagnóstico analítico estructurado automático incluso en modo offline / sin API Key.
-- **Didáctica y Reactividad con Streamlit:** Actualización inmediata ante cambios de parámetros, tarjetas de métricas (RMSE, % de cobertura válida) y catálogo de funciones de estudio guiadas.
+- **Interfaz Streamlit:** deslizadores para el orden $n$, el centro $(x_0, y_0)$ y el radio de visualización; catálogo de funciones precargadas; métricas en tiempo real y caché `@st.cache_data`.
 
 ---
 
-## 🔑 Configuración de Variables de Entorno (Tutor IA)
+## ¿Primera vez? Cómo usar la app (sin saber Cálculo)
+
+**La idea en una frase:** una función complicada se puede *imitar* con un polinomio sencillo cerca de un punto. La app muestra esa imitación ("la copia") y dónde funciona.
+
+1. **Pestaña "Empieza aquí":** la idea explicada con una curva, en una sola variable. Mueve el grado y observa cómo la línea naranja se pega a la azul.
+2. **Experimentos guiados (barra lateral):** 6 botones en orden. Cada uno carga una configuración, abre el Visor 3D y explica qué observar.
+3. **Visor 3D:** azul = función real, naranja = copia, rombo amarillo = punto de apoyo. El cuadro **"¿Qué estás viendo?"** describe en palabras lo que hay en pantalla.
+4. **¿Dónde funciona?:** mapa verde (la copia sirve) / rojo (se equivoca demasiado).
+5. **Las matemáticas:** fórmulas, gradiente y matriz Hessiana, con explicación en palabras.
+6. **Glosario** (al final de la barra lateral): cada término técnico explicado sin jerga.
+
+---
+
+## Configuración de Variables de Entorno (Tutor IA)
 
 El proyecto incluye soporte para **Google Gemini** (con nivel gratuito en [Google AI Studio](https://aistudio.google.com/)) y **DeepSeek** ([DeepSeek Platform](https://platform.deepseek.com/)).
 
@@ -50,11 +65,11 @@ El proyecto incluye soporte para **Google Gemini** (con nivel gratuito en [Googl
    DEEPSEEK_MODEL=deepseek-chat
    ```
 
-> 💡 *También puedes ingresar tu API Key directamente en el campo de texto de la barra lateral de la aplicación web.*
+> *Nota: También puedes ingresar tu API Key directamente en el campo de texto de la barra lateral de la aplicación web.*
 
 ---
 
-## 📦 Instalación y Requisitos
+## Instalación y Requisitos
 
 Requiere **Python 3.10+**.
 
@@ -105,7 +120,7 @@ docker run -d -p 8501:8501 --env-file .env --name visualizador_app visualizador-
 
 ---
 
-## 🧪 Ejecución de Pruebas Automatizadas
+## Ejecución de Pruebas Automatizadas
 
 El proyecto cuenta con una suite completa de pruebas unitarias y de rendimiento:
 
@@ -115,7 +130,7 @@ pytest -v
 
 ---
 
-## 📂 Estructura del Código
+## Estructura del Código
 
 ```text
 visualizador_taylor/
@@ -123,13 +138,12 @@ visualizador_taylor/
 ├── core/
 │   ├── __init__.py
 │   ├── ai_tutor.py            # Tutor pedagógico con IA (Gemini y DeepSeek)
-│   ├── parser.py              # Validación, sanitización y parseo seguro
-│   ├── taylor_engine.py       # Algoritmo de Taylor multivariable (SymPy)
-│   └── numeric_eval.py        # Malla NumPy, cálculo de residuo y tolerancia
+│   └── taylor_math.py         # Backend: parseo seguro, Taylor (SymPy), malla, percentiles, residuo y comparador
 ├── ui/
 │   ├── __init__.py
 │   ├── components.py          # Panel lateral, controles y catálogo de presets
 │   ├── latex_display.py       # Renderizado de fórmulas y pasos en LaTeX
+│   ├── plotting_2d.py         # Mapa de calor 2D log10(E) con curvas de nivel
 │   └── plotting_3d.py         # Generación de gráficos espaciales Plotly
 ├── tests/
 │   ├── test_ai_tutor.py       # Pruebas del tutor inteligente

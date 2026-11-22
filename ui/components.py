@@ -1,17 +1,35 @@
-"""Módulo de componentes de interfaz, controles y presets didácticos para Streamlit."""
+"""Controles de la barra lateral, catálogo de funciones y experimentos guiados (Streamlit)."""
 
 from dataclasses import dataclass
 import streamlit as st
+from core.taylor_math import MIN_DEGREE, MAX_DEGREE
+from ui.explanations import EXPERIMENTS, GLOSSARY, Experiment
+from ui.tabs import TAB_3D
 
+# Nombre amigable -> fórmula
 PRESETS = {
-    "Personalizada": "",
-    "Ondulatoria (sin(x) * cos(y))": "sin(x) * cos(y)",
-    "Paraboloide Elíptico (x^2 + y^2)": "x^2 + y^2",
-    "Silla de Montar (x^2 - y^2)": "x^2 - y^2",
-    "Campana Gaussiana (exp(-(x^2 + y^2)))": "exp(-(x^2 + y^2))",
-    "Superficie Mono-cuadrática (x^2 + 2*y)": "x^2 + 2*y",
-    "Cúbica de Mono (x^3 - 3*x*y^2)": "x^3 - 3*x*y^2",
-    "Logarítmica Suave (log(1 + x^2 + y^2))": "log(1 + x^2 + y^2)",
+    "Olas (seno × coseno)": "sin(x) * cos(y)",
+    "Tazón (paraboloide)": "x^2 + y^2",
+    "Silla de montar": "x^2 - y^2",
+    "Colina suave (campana)": "exp(-(x^2 + y^2))",
+    "Canal inclinado": "x^2 + 2*y",
+    "Silla de mono (3 valles)": "x^3 - 3*x*y^2",
+    "Embudo logarítmico": "log(1 + x^2 + y^2)",
+    "Escribir mi propia función": "",
+}
+CUSTOM_PRESET = "Escribir mi propia función"
+
+# Valores iniciales de los widgets (claves de st.session_state)
+DEFAULTS = {
+    "preset": "Olas (seno × coseno)",
+    "func_str": PRESETS["Olas (seno × coseno)"],
+    "degree": 1,
+    "x0": 0.0,
+    "y0": 0.0,
+    "radius": 3.0,
+    "resolution": 40,
+    "tolerance": 0.20,
+    "taylor_opacity": 0.70,
 }
 
 
@@ -22,115 +40,163 @@ class UIParameters:
     x0: float
     y0: float
     degree: int
-    x_range: tuple[float, float]
-    y_range: tuple[float, float]
+    radius: float        # Radio de visualización (vecindad) alrededor de (x0, y0)
+    resolution: int      # Puntos por eje de la malla
     tolerance: float
-    show_real: bool
-    show_taylor: bool
-    show_anchor: bool
-    show_tolerance_mask: bool
-    real_opacity: float
     taylor_opacity: float
-    show_error_surface: bool
+
+    @property
+    def x_range(self) -> tuple[float, float]:
+        return (self.x0 - self.radius, self.x0 + self.radius)
+
+    @property
+    def y_range(self) -> tuple[float, float]:
+        return (self.y0 - self.radius, self.y0 + self.radius)
+
+
+def init_session_state() -> None:
+    for key, value in DEFAULTS.items():
+        st.session_state.setdefault(key, value)
+
+
+def _on_preset_change() -> None:
+    formula = PRESETS[st.session_state["preset"]]
+    if formula:
+        st.session_state["func_str"] = formula
+
+
+def load_experiment(exp: Experiment) -> None:
+    """Carga un experimento guiado en los controles (se usa como callback de botón)."""
+    st.session_state.update(
+        preset=exp.preset,
+        func_str=PRESETS[exp.preset],
+        degree=exp.degree,
+        x0=exp.x0,
+        y0=exp.y0,
+        radius=exp.radius,
+        active_experiment=exp.title,
+        main_tab=TAB_3D,
+    )
+
+
+def reset_controls() -> None:
+    st.session_state.update(DEFAULTS)
+    st.session_state.pop("active_experiment", None)
 
 
 def render_sidebar_controls() -> UIParameters:
-    """Renderiza todos los controles de la barra lateral y retorna los parámetros configurados."""
-    st.sidebar.header("Parámetros del Modelo")
+    """Renderiza los controles de la barra lateral y retorna los parámetros configurados."""
+    init_session_state()
+    sb = st.sidebar
 
-    # 1. Preset o función personalizada
-    selected_preset = st.sidebar.selectbox(
-        "Catálogo de Ejemplos Didácticos",
+    # 0. Experimentos guiados
+    sb.header("Experimentos guiados", icon=":material/school:")
+    sb.caption("¿No sabes por dónde empezar? Haz clic en orden y observa el visor 3D.")
+    for exp in EXPERIMENTS:
+        sb.button(exp.title, on_click=load_experiment, args=(exp,), width="stretch", key=f"exp_{exp.title}")
+
+    sb.markdown("---")
+    sb.header("Controles", icon=":material/tune:")
+
+    # 1. Función
+    sb.selectbox(
+        "1 · Elige una superficie",
         options=list(PRESETS.keys()),
-        index=1,  # Default: sin(x) * cos(y)
+        key="preset",
+        on_change=_on_preset_change,
+        help="Cada opción es una 'forma de terreno' distinta. La fórmula aparece en el campo de abajo.",
+    )
+    func_str = sb.text_input(
+        "Fórmula f(x, y)",
+        key="func_str",
+        help=(
+            "Puedes editarla. Ejemplos: sin(x)*cos(y), x^2 + y^2, exp(-(x^2+y^2)). "
+            "Usa ^ para potencias y * para multiplicar."
+        ),
     )
 
-    default_func = PRESETS[selected_preset] if selected_preset != "Personalizada" else "sin(x) + cos(y)"
-    func_str = st.sidebar.text_input(
-        "Función f(x, y)",
-        value=default_func,
-        help="Ingresa cualquier función analítica. Ej: sin(x)*cos(y), x^2 + y^2, exp(-(x^2+y^2))",
-    )
-
-    # 2. Punto de expansión (x0, y0)
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Punto de Apoyo $(x_0, y_0)$")
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        x0 = float(st.number_input("x₀", value=0.0, step=0.1, format="%.2f"))
-    with col2:
-        y0 = float(st.number_input("y₀", value=0.0, step=0.1, format="%.2f"))
-
-    # 3. Grado del polinomio
+    # 2. Grado
     degree = int(
-        st.sidebar.slider(
-            "Grado del Polinomio (n)",
-            min_value=1,
-            max_value=5,
-            value=1,
-            help="Grado 1 = Plano Tangente. Grados mayores incorporan curvatura y órdenes superiores.",
+        sb.slider(
+            "2 · Grado de la copia (n)",
+            min_value=MIN_DEGREE,
+            max_value=MAX_DEGREE,
+            key="degree",
+            help=(
+                "Qué tanto detalle copia el polinomio. 0 = solo la altura (un piso plano), "
+                "1 = también la inclinación (plano tangente), 2 = también la curvatura, 3-6 = detalles más finos."
+            ),
         )
     )
-
-    # 4. Ventana de visualización (dominio)
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Ventana de Visualización")
-    x_range = st.sidebar.slider(
-        "Rango en X",
-        min_value=-10.0,
-        max_value=10.0,
-        value=(max(-5.0, x0 - 3.0), min(5.0, x0 + 3.0)),
-        step=0.5,
-    )
-    y_range = st.sidebar.slider(
-        "Rango en Y",
-        min_value=-10.0,
-        max_value=10.0,
-        value=(max(-5.0, y0 - 3.0), min(5.0, y0 + 3.0)),
-        step=0.5,
+    sb.caption(
+        {
+            0: "📏 Grado 0: un piso plano.",
+            1: "📐 Grado 1: plano inclinado (tangente).",
+            2: "🥣 Grado 2: copia la curvatura.",
+        }.get(degree, f"🔬 Grado {degree}: detalles finos.")
     )
 
-    # 5. Tolerancia del error
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Análisis del Residuo")
+    # 3. Punto de apoyo
+    sb.subheader("3 · Punto de apoyo (x₀, y₀)", icon=":material/my_location:")
+    sb.caption("Dónde se 'pega' la copia a la superficie (el rombo amarillo).")
+    x0 = round(float(sb.slider("x₀", min_value=-5.0, max_value=5.0, step=0.1, key="x0")), 4)
+    y0 = round(float(sb.slider("y₀", min_value=-5.0, max_value=5.0, step=0.1, key="y0")), 4)
+
+    # 4. Tolerancia
+    sb.subheader("4 · Error aceptable (ε)", icon=":material/rule:")
     tolerance = float(
-        st.sidebar.number_input(
-            "Umbral de Tolerancia (|Error| ≤ ε)",
+        sb.number_input(
+            "¿Cuánto error aceptas?",
             min_value=0.001,
             max_value=5.0,
-            value=0.20,
             step=0.05,
             format="%.3f",
-            help="Define la región de convergencia o validez donde la aproximación difiere menos de ε de la función original.",
+            key="tolerance",
+            help="Si la copia se equivoca menos que este valor en un lugar, decimos que 'sirve' ahí.",
         )
     )
 
-    # 6. Opciones de visualización
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Capas y Visibilidad 3D")
-    show_real = st.sidebar.checkbox("Superficie Original f(x, y)", value=True)
-    show_taylor = st.sidebar.checkbox("Aproximación de Taylor P_n(x, y)", value=True)
-    show_anchor = st.sidebar.checkbox("Punto de Anclaje (x₀, y₀)", value=True)
-    show_tolerance_mask = st.sidebar.checkbox("Zona de Tolerancia (|Error| ≤ ε)", value=True)
-    show_error_surface = st.sidebar.checkbox("Ver Superficie de Error Dedicada", value=False)
+    # 5. Opciones de visualización (avanzadas)
+    with sb.expander("Opciones de visualización", icon=":material/visibility:"):
+        radius = float(
+            st.slider(
+                "Tamaño de la ventana (radio r)",
+                min_value=0.5,
+                max_value=10.0,
+                step=0.5,
+                key="radius",
+                help="Se dibuja el cuadrado [x₀ − r, x₀ + r] × [y₀ − r, y₀ + r].",
+            )
+        )
+        resolution = int(
+            st.slider(
+                "Resolución (puntos por eje)",
+                min_value=20,
+                max_value=100,
+                step=10,
+                key="resolution",
+                help="Más puntos = gráficas más suaves pero más lentas.",
+            )
+        )
+        taylor_opacity = float(
+            st.slider("Opacidad de la copia naranja", 0.1, 1.0, step=0.05, key="taylor_opacity")
+        )
 
-    with st.sidebar.expander("Ajustes de Opacidad"):
-        real_opacity = st.slider("Opacidad de f(x, y)", 0.1, 1.0, 0.85, 0.05)
-        taylor_opacity = st.slider("Opacidad de Taylor", 0.1, 1.0, 0.70, 0.05)
+    sb.button("Restablecer todo", icon=":material/restart_alt:", on_click=reset_controls, width="stretch")
+
+    # 6. Glosario
+    sb.markdown("---")
+    with sb.expander("Glosario: ¿qué significa…?", icon=":material/menu_book:"):
+        for term, meaning in GLOSSARY.items():
+            st.markdown(f"**{term}** — {meaning}")
 
     return UIParameters(
         func_str=func_str,
         x0=x0,
         y0=y0,
         degree=degree,
-        x_range=x_range,
-        y_range=y_range,
+        radius=radius,
+        resolution=resolution,
         tolerance=tolerance,
-        show_real=show_real,
-        show_taylor=show_taylor,
-        show_anchor=show_anchor,
-        show_tolerance_mask=show_tolerance_mask,
-        real_opacity=real_opacity,
         taylor_opacity=taylor_opacity,
-        show_error_surface=show_error_surface,
     )

@@ -238,10 +238,16 @@ def generate_heuristic_explanation(
     Genera un diagnóstico pedagógico analítico estructurado cuando no hay una API Key configurada.
     """
     text = []
-    text.append(f"### 📘 Diagnóstico Didáctico Automatizado para $f(x, y) = {func_str}$")
+    text.append(f"### :material/school: Diagnóstico Didáctico Automatizado para $f(x, y) = {func_str}$")
     text.append(f"- **Punto de anclaje:** En $(x_0, y_0) = ({x0}, {y0})$, la superficie alcanza la altura $z = {f0:.4f}$.")
 
-    if degree == 1:
+    if degree == 0:
+        text.append(
+            f"- **Plano Horizontal ($n=0$):** El polinomio es la constante $P_0 = {f0:.4f}$. "
+            f"No incorpora pendiente ni curvatura, así que el error crece linealmente en cuanto "
+            f"la superficie deja de ser plana alrededor del centro."
+        )
+    elif degree == 1:
         text.append(
             f"- **Plano Tangente ($n=1$):** La pendiente en dirección $x$ es $f_x = {fx}$ y en $y$ es $f_y = {fy}$. "
             f"El plano tangente es una aproximación puramente plana (lineal). No captura la curvatura, por lo que el error "
@@ -266,7 +272,7 @@ def generate_heuristic_explanation(
     text.append(
         f"- **Comportamiento del Residuo:** Con una tolerancia $\\epsilon = {tolerance}$, la aproximación cubre el "
         f"**{valid_pct:.1f}%** de la ventana visualizada (radio de confianza $\\approx {valid_radius:.2f}$ unidades). "
-        f"Fuera de esta zona verde, la tasa de divergencia del polinomio supera el umbral permitido."
+        f"Fuera de la región de validez (curva blanca E = ε del mapa de calor), la tasa de divergencia del polinomio supera el umbral permitido."
     )
 
     return "\n\n".join(text)
@@ -321,7 +327,7 @@ def explain_current_state_with_ai(
         )
         return (
             fallback
-            + "\n\n> 💡 *Para habilitar explicaciones generadas en tiempo real por IA (Gemini / DeepSeek), "
+            + "\n\n> :material/lightbulb: *Para habilitar explicaciones generadas en tiempo real por IA (Gemini / DeepSeek), "
             "configura tu API Key en el archivo `.env` o ingrésala en la barra lateral.*"
         )
 

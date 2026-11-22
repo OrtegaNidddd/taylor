@@ -2,7 +2,7 @@
 
 import pytest
 import sympy as sp
-from core.parser import (
+from core.taylor_math import (
     parse_function_2d,
     MathParserError,
     MathSyntaxError,
